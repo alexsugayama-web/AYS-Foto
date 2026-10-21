@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Foto 2×2 para visto americano</title>
+  <meta name="description" content="Transforme uma foto comum em uma foto 2×2 (5 × 5 cm) para visto e passaporte dos Estados Unidos. JPEG de 600 × 600 pixels pronto para o DS-160, feito no seu navegador.">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:title" content="Foto 2×2 para visto americano">
+  <meta property="og:description" content="Envie uma foto e baixe o JPEG de 600 × 600 pixels no padrão do DS-160. Tudo acontece no seu navegador.">
+  <meta name="theme-color" content="#0f2342">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://storage.googleapis.com" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body data-status="idle">
+  <a class="skip" href="#ferramenta">Ir para a ferramenta</a>
+
+  <div class="page">
+    <header class="intro">
+      <h1>Foto 2×2</h1>
+      <p class="lede">Para visto e passaporte dos Estados Unidos. Envie uma foto sua e baixe o JPEG de 600 × 600 pixels, já enquadrado no padrão de 5 × 5 cm pedido no formulário <span class="nowrap">DS-160</span>.</p>
+      <p class="privacy">A foto é processada no seu navegador e não é enviada a nenhum servidor.</p>
+    </header>
+
+    <main id="ferramenta" class="tool">
+      <section class="bench" aria-label="Prévia da foto">
+        <div class="bench-grid">
+          <svg class="ruler ruler-top" id="rulerTop" aria-hidden="true"></svg>
+          <svg class="ruler ruler-left" id="rulerLeft" aria-hidden="true"></svg>
+          <div class="frame" id="frame">
+            <canvas id="preview" tabindex="0" role="img" aria-label="Prévia da foto 2×2. Arraste para mover, use a roda do mouse ou as teclas + e − para o zoom."></canvas>
+            <div class="empty">
+              <p class="empty-title"><span class="only-fine">Arraste uma foto para cá</span><span class="only-coarse">Escolha uma foto ou tire uma agora</span></p>
+              <button type="button" class="btn btn-primary" id="pick">Escolher foto</button>
+              <p class="empty-note">JPG, PNG ou WebP.<span class="only-fine"> Você também pode colar uma imagem.</span></p>
+            </div>
+          </div>
+        </div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div class="bench-actions">
+          <button type="button" class="btn" id="change">Trocar foto</button>
+          <button type="button" class="btn" id="refit">Enquadrar de novo</button>
+        </div>
+        <input type="file" id="file" accept="image/*" hidden>
+      </section>
+
+      <section class="panel" aria-label="Ajustes e conferência">
+        <div class="group">
+          <h2>Ajuste fino</h2>
+          <p class="hint">Arraste a foto para mover. No celular, use dois dedos para aproximar.</p>
+          <label class="slider" for="zoom">
+            <span class="slider-head"><span>Zoom</span><output id="zoomOut" for="zoom">100%</output></span>
+            <input type="range" id="zoom" min="-100" max="100" step="1" value="0">
+          </label>
+          <label class="slider" for="rot">
+            <span class="slider-head"><span>Inclinação</span><output id="rotOut" for="rot">0°</output></span>
+            <input type="range" id="rot" min="-150" max="150" step="1" value="0">
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="whiten" role="switch">
+            <span class="switch-text">Fundo branco<small id="whitenHint">Troca o fundo por branco liso. Confira as bordas do cabelo.</small></span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="guides" role="switch" checked>
+            <span class="switch-text">Mostrar guias<small>As guias aparecem só na tela, não no arquivo.</small></span>
+          </label>
+        </div>
+
+        <div class="group">
+          <h2>Conferência</h2>
+          <p class="summary" id="summary" aria-live="polite"></p>
+          <ul class="checks" id="checks">
+            <li class="check is-idle">Envie uma foto para conferir as medidas.</li>
+          </ul>
+        </div>
+
+        <div class="group download">
+          <button type="button" class="btn btn-primary btn-wide" id="download" disabled>Baixar foto 2×2</button>
+          <p class="file-note" id="fileNote">JPEG, 600 × 600 pixels, 300 dpi, até 240 kB.</p>
+        </div>
+      </section>
+    </main>
+
+    <section class="tips" aria-labelledby="tips-title">
+      <h2 id="tips-title">Para a foto ser aceita</h2>
+      <ul>
+        <li>Fique de frente para a câmera, com expressão neutra e os dois olhos abertos.</li>
+        <li>Tire os óculos. Eles não são aceitos em fotos de visto desde 2016.</li>
+        <li>Use luz uniforme no rosto, sem sombras, de preferência com uma parede branca ou clara atrás.</li>
+        <li>Peça para alguém tirar a foto a cerca de 1,5 metro, na altura dos olhos. A selfie de braço esticado deforma o rosto.</li>
+        <li>Não use boné, chapéu nem fones. Cobertura religiosa usada no dia a dia é permitida se não esconder o rosto.</li>
+        <li>A foto precisa ter sido tirada nos últimos seis meses e mostrar a sua aparência atual.</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      <p>Ferramenta independente, sem vínculo com o governo dos Estados Unidos. Quem decide se a foto é aceita é o consulado. Veja os <a href="https://travel.state.gov/content/travel/en/us-visas/visa-information-resources/photos.html" rel="noopener">requisitos oficiais</a>.</p>
+      <p>O rosto é detectado pelo MediaPipe, do Google, que é baixado e executado no seu navegador. Nenhuma foto é enviada.</p>
+    </footer>
+  </div>
+</body>
+</html>
