@@ -252,6 +252,23 @@ a {
   cursor: grabbing;
 }
 
+/* resposta ao botão Enquadrar: o contorno do quadro pisca uma vez */
+.frame.is-framed {
+  animation: framed 0.8s ease-out;
+}
+
+@keyframes framed {
+  from {
+    outline: 3px solid var(--guide);
+    outline-offset: 5px;
+  }
+
+  to {
+    outline: 1px solid var(--rule);
+    outline-offset: 0;
+  }
+}
+
 .frame.is-drop {
   outline: 2px solid var(--guide);
   outline-offset: 0;
@@ -714,6 +731,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
   }
 }
 </style>
@@ -1212,11 +1230,16 @@ const SEG_MODEL =
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
 
 let loading = null;
+let attempts = 0;
 
 function loadVision() {
   if (!loading) {
+    // O navegador guarda a falha de um import() e não busca o mesmo endereço
+    // de novo; nas novas tentativas o endereço ganha um parâmetro diferente.
+    attempts++;
+    const bundle = `${MP_BASE}/vision_bundle.mjs${attempts > 1 ? `?tentativa=${attempts}` : ""}`;
     loading = (async () => {
-      const { FilesetResolver, FaceLandmarker, ImageSegmenter } = await import(`${MP_BASE}/vision_bundle.mjs`);
+      const { FilesetResolver, FaceLandmarker, ImageSegmenter } = await import(bundle);
       const fileset = await FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
       const landmarker = await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: FACE_MODEL, delegate: "CPU" },
@@ -1522,6 +1545,7 @@ const el = {
   rot: $("rot"),
   rotOut: $("rotOut"),
   whiten: $("whiten"),
+  fill: $("fill"),
   whitenHint: $("whitenHint"),
   guides: $("guides"),
   summary: $("summary"),
@@ -1758,14 +1782,21 @@ async function analyzeCurrent() {
   } else if (!state.face) {
     setStatus("Nenhum rosto encontrado. Arraste a foto e use o zoom para encaixar a cabeça no oval.", "warn");
   } else {
-    let msg = "Pronto. A foto foi enquadrada no padrão; confira a lista e baixe o arquivo.";
-    const m = measure(state.face, state.view);
-    if (m.top < -0.01 || m.head > SPEC.head.max) {
-      msg = "Pronto. Como a foto original é justa, ela foi aproximada para preencher o quadro inteiro; confira a lista e baixe o arquivo.";
-    }
-    if (state.whiten) msg += " O fundo foi trocado por branco porque o original não era claro.";
-    setStatus(msg, "ok");
+    setStatus(framedMessage(), "ok");
   }
+}
+
+function framedMessage() {
+  const m = measure(state.face, state.view);
+  let msg = "Pronto. A foto foi enquadrada em 2 × 2 cm; confira a lista e baixe o arquivo.";
+  if (m.top < -0.01 || m.head > SPEC.head.max) {
+    msg = el.fill.checked
+      ? "Pronto. Como a foto original é justa, ela foi aproximada para preencher o quadro inteiro. Para mostrar a cabeça inteira, desligue Preencher o quadro inteiro."
+      : "Pronto. A foto foi enquadrada em 2 × 2 cm; confira a lista e baixe o arquivo.";
+  }
+  if (state.whiten && state.whitenReason === "margin") msg += " O fundo foi trocado por branco para completar o quadro.";
+  else if (state.whiten && state.whitenReason === "dark") msg += " O fundo foi trocado por branco porque o original não era claro.";
+  return msg;
 }
 
 async function analyze(v) {
@@ -1807,11 +1838,16 @@ async function analyze(v) {
   state.lightBg = !!(state.bg.known && state.bg.light);
   state.bgColor = state.bg.color || "#ffffff";
   state.whiten = !!(state.face && state.bg.known && !state.bg.light);
+  state.whitenReason = state.whiten ? "dark" : "";
 
   state.auto = state.face ? autoFillView(state.face, W, H, allowSides()) : centerView(W, H);
   state.view = { ...state.auto };
   state.baseL = state.auto.L;
   state.manual = false;
+  if (!el.fill.checked && state.face && !state.whiten && viewExceedsImage()) {
+    state.whiten = true;
+    state.whitenReason = "margin";
+  }
   if (!maskCovers()) refreshMask(v);
   state.bg = analyzeBackground(src, state.view, state.mask);
 }
@@ -1821,6 +1857,7 @@ async function analyze(v) {
 // ou fundo original claro e liso). Nos outros lados o quadro é preenchido
 // com a própria foto.
 function allowSides() {
+  if (!el.fill.checked) return { top: true, bottom: true, left: true, right: true };
   const t = state && state.touch;
   const ok = !!t && (state.whiten || state.lightBg);
   return {
@@ -1829,6 +1866,24 @@ function allowSides() {
     left: ok && !t.left,
     right: ok && !t.right,
   };
+}
+
+// Com "Preencher" desligado o quadro pode passar da foto original; para a
+// sobra não aparecer como uma faixa de outra cor, o fundo vira branco.
+function viewExceedsImage() {
+  const v = state.view;
+  const k = Math.abs(Math.cos(v.theta)) + Math.abs(Math.sin(v.theta));
+  const e = (v.L * k) / 2;
+  return v.cx - e < -0.5 || v.cy - e < -0.5 || v.cx + e > state.src.width + 0.5 || v.cy + e > state.src.height + 0.5;
+}
+
+function whitenIfExceeds() {
+  if (el.fill.checked || !vision || state.visionFailed || !state.face || state.whiten) return;
+  if (!viewExceedsImage()) return;
+  state.whiten = true;
+  state.whitenReason = "margin";
+  el.whiten.checked = true;
+  ensureMask();
 }
 
 function fillColor() {
@@ -2127,7 +2182,7 @@ function syncSliders() {
 }
 
 function setControlsEnabled(on) {
-  for (const n of [el.zoom, el.rot, el.guides, el.refit, el.change, el.download]) n.disabled = !on;
+  for (const n of [el.zoom, el.rot, el.guides, el.fill, el.refit, el.change, el.download]) n.disabled = !on;
   el.whiten.disabled = !on || !vision || !state || state.visionFailed;
   el.whitenHint.textContent =
     state && state.visionFailed
@@ -2388,6 +2443,7 @@ el.rot.addEventListener("input", () => {
 el.whiten.addEventListener("change", () => {
   if (!state) return;
   state.whiten = el.whiten.checked;
+  state.whitenReason = "";
   if (!state.manual && state.face) {
     state.auto = autoFillView(state.face, state.src.width, state.src.height, allowSides());
     state.view = { ...state.auto };
@@ -2399,8 +2455,21 @@ el.whiten.addEventListener("change", () => {
 
 el.guides.addEventListener("change", requestRender);
 
-el.refit.addEventListener("click", () => {
-  if (!state) return;
+function flashFrame() {
+  el.frame.classList.remove("is-framed");
+  void el.frame.offsetWidth;
+  el.frame.classList.add("is-framed");
+}
+
+// Botão "Enquadrar em 2×2 cm": aplica o enquadramento automático. Se o
+// detector ainda não tinha rodado (carregou depois ou falhou), tenta de novo.
+async function frameNow() {
+  if (!state || busy) return;
+  if (state.visionFailed || (!state.face && !state.noFace)) {
+    await analyzeCurrent();
+    flashFrame();
+    return;
+  }
   if (state.face) {
     state.auto = autoFillView(state.face, state.src.width, state.src.height, allowSides());
     state.baseL = state.auto.L;
@@ -2408,8 +2477,36 @@ el.refit.addEventListener("click", () => {
   state.view = { ...state.auto };
   el.zoom.value = "0";
   el.rot.value = "0";
+  whitenIfExceeds();
   ensureMask();
   changed(false);
+  if (state.face) setStatus(framedMessage(), "ok");
+  else setStatus("Nenhum rosto encontrado. Arraste a foto e use o zoom para encaixar a cabeça no oval.", "warn");
+  flashFrame();
+}
+
+el.refit.addEventListener("click", frameNow);
+
+// Preencher o quadro inteiro (padrão) ou mostrar a cabeça inteira, completando
+// com branco o que faltar na foto original.
+el.fill.addEventListener("change", () => {
+  if (!state) return;
+  if (el.fill.checked && state.whitenReason === "margin") {
+    // o fundo branco tinha sido ligado só para completar as margens
+    state.whiten = false;
+    state.whitenReason = "";
+    el.whiten.checked = false;
+  }
+  if (!state.manual && state.face) {
+    state.auto = autoFillView(state.face, state.src.width, state.src.height, allowSides());
+    state.view = { ...state.auto };
+    state.baseL = state.auto.L;
+    el.zoom.value = "0";
+  }
+  whitenIfExceeds();
+  ensureMask();
+  changed(state.manual);
+  if (state.face && !state.manual) setStatus(framedMessage(), "ok");
 });
 
 el.pick.addEventListener("click", (e) => {
@@ -2539,8 +2636,8 @@ if (new URLSearchParams(location.search).has("debug")) {
         </div>
         <p class="status" id="status" role="status" aria-live="polite"></p>
         <div class="bench-actions">
+          <button type="button" class="btn btn-primary" id="refit">Enquadrar em 2×2 cm</button>
           <button type="button" class="btn" id="change">Trocar foto</button>
-          <button type="button" class="btn" id="refit">Enquadrar de novo</button>
         </div>
         <input type="file" id="file" accept="image/*" hidden>
       </section>
@@ -2556,6 +2653,10 @@ if (new URLSearchParams(location.search).has("debug")) {
           <label class="slider" for="rot">
             <span class="slider-head"><span>Inclinação</span><output id="rotOut" for="rot">0°</output></span>
             <input type="range" id="rot" min="-150" max="150" step="1" value="0">
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="fill" role="switch" checked>
+            <span class="switch-text">Preencher o quadro inteiro<small>Aproxima a foto quando ela é justa, para não sobrar espaço vazio. Desligado, a cabeça aparece inteira e o que faltar fica branco.</small></span>
           </label>
           <label class="switch">
             <input type="checkbox" id="whiten" role="switch">
